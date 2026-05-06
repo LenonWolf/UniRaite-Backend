@@ -13,6 +13,7 @@ import { PrismaClient } from '@prisma/client'
 
 require('dotenv').config()
 
+
 const app = express()
 const serverHttp = http.createServer(app)
 const io = new Server(serverHttp, {
