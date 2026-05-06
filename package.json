@@ -9,8 +9,8 @@
   "dependencies": {
     "@emailjs/nodejs": "^5.0.2",
     "@google-cloud/vision": "^5.3.5",
-    "@orpc/client": "^1.14.0",
-    "@orpc/server": "^1.14.0",
+    "@orpc/client": "^1.14.2",
+    "@orpc/server": "^1.14.2",
     "@prisma/client": "^6.19.3",
     "@react-native-picker/picker": "2.11.1",
     "@turf/turf": "^7.3.5",
