@@ -1,0 +1,192 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Usuarios
+model usuarios {
+  id_usuario           String    @id @default(cuid())
+  nombre               String
+  apellido_paterno     String
+  apellido_materno     String?
+  correo_inst          String    @unique
+  password_hash        String
+  reset_token          String?
+  reset_expires        DateTime?
+  num_control          String    @unique
+  carrera              String?
+  universidad          String?
+  foto_perfil          String?
+  foto_credencial      String?
+  es_conductor         Boolean   @default(false)
+  verificado           Boolean   @default(false)
+  licencia_de_conducir String?   @unique 
+  reputacion_promedio  Float?
+  created_at           DateTime  @default(now())
+  updated_at           DateTime  @updatedAt
+  contacto_emergencia  String?
+  viajes_completados Int @default(0)
+
+  // Relaciones
+  conductor              conductores?        
+  solicitudes            solicitudes_viaje[]
+  mensajes_enviados      mensajes_chat[]     @relation("EmisorMensajes")
+  notificaciones         notificaciones[]
+  reportes               incidentes_seguridad[]
+  calificaciones_hechas  calificaciones[]    @relation("Evaluador")
+  calificaciones_recibidas calificaciones[]  @relation("Evaluado")
+}
+
+// Conductores (Ahora incluye datos del vehículo)
+model conductores {
+  id_licencia         String    @id
+  foto_licencia       String?
+  foto_circulacion    String?
+  
+  // Atributos transferidos de la tabla vehiculo
+  modelo              String
+  color               String
+  placas              String
+  capacidad_pasajeros Int
+  foto_auto_url       String?
+  
+  // Relaciones
+  usuario             usuarios? @relation(fields: [id_licencia], references: [licencia_de_conducir])
+  viajes_publicados   viajes_publicados[] 
+}
+
+// Viajes publicados 
+model viajes_publicados {
+  id_viaje_pub         Int      @id @default(autoincrement())
+  id_licencia_conductor String   
+  origen_texto         String
+  destino_texto        String
+  
+  // Coordenadas exactas para el algoritmo de Match
+  latitud_origen       Float
+  longitud_origen      Float
+  latitud_destino      Float
+  longitud_destino     Float
+
+  // Ruta dibujada de Google Maps
+  polyline             String?  @db.Text
+
+  fecha_hora_salida    DateTime
+  asientos_disponibles Int
+  pasajeros_confirmados Int?
+  costo_estimado       Float
+  es_recurrente        Boolean
+  comentario_extra     String?
+  
+  // Relación directa al conductor
+  conductor            conductores @relation(fields: [id_licencia_conductor], references: [id_licencia])
+  solicitudes          solicitudes_viaje[]
+  mensajes             mensajes_chat[]
+  viajes_activos       viajes_activos[]
+}
+
+// Solicitudes 
+model solicitudes_viaje {
+  id_solicitud      Int      @id @default(autoincrement())
+  id_viaje_pub      Int
+  id_pasajero       String
+  estado_solicitud  EstadoSolicitud
+  fecha_solicitud   DateTime
+  latitud_recogida  Float?
+  longitud_recogida Float?
+
+  viaje             viajes_publicados @relation(fields: [id_viaje_pub], references: [id_viaje_pub])
+  pasajero          usuarios @relation(fields: [id_pasajero], references: [id_usuario])
+}
+
+// Mensajes 
+model mensajes_chat {
+  id_mensaje        Int      @id @default(autoincrement())
+  id_viaje_pub      Int
+  id_emisor         String
+  contenido         String
+  fecha_envio       DateTime
+  leido             Boolean  @default(false)
+
+  viaje             viajes_publicados @relation(fields: [id_viaje_pub], references: [id_viaje_pub])
+  emisor            usuarios @relation("EmisorMensajes", fields: [id_emisor], references: [id_usuario])
+}
+
+// Viajes activos 
+model viajes_activos {
+  id_viaje_activo   Int      @id @default(autoincrement())
+  id_viaje_pub      Int
+  hora_inicio_real  DateTime
+  hora_fin_real     DateTime?
+  estado_trayecto   EstadoTrayecto
+  historial_ruta    Json?
+
+  viaje             viajes_publicados @relation(fields: [id_viaje_pub], references: [id_viaje_pub])
+  incidentes        incidentes_seguridad[]
+  calificaciones    calificaciones[]
+}
+
+// Incidentes 
+model incidentes_seguridad {
+  id_incidente       Int      @id @default(autoincrement())
+  id_viaje_activo    Int
+  id_usuario_reporta String
+  tipo_emergencia    TipoEmergencia
+  descripcion_breve  String
+  ubicacion_lat_lng  String
+  fecha_reporte      DateTime
+
+  viaje_activo       viajes_activos @relation(fields: [id_viaje_activo], references: [id_viaje_activo])
+  usuario            usuarios @relation(fields: [id_usuario_reporta], references: [id_usuario])
+}
+
+// Calificaciones 
+model calificaciones {
+  id_calificacion   Int      @id @default(autoincrement())
+  id_viaje_activo   Int
+  id_evaluador      String
+  id_evaluado       String
+  estrellas         Int
+  comentario        String?
+
+  viaje_activo      viajes_activos @relation(fields: [id_viaje_activo], references: [id_viaje_activo])
+  evaluador         usuarios @relation("Evaluador", fields: [id_evaluador], references: [id_usuario])
+  evaluado          usuarios @relation("Evaluado", fields: [id_evaluado], references: [id_usuario])
+}
+
+// Notificaciones 
+model notificaciones {
+  id_notificacion   Int      @id @default(autoincrement())
+  id_usuario        String
+  titulo            String
+  cuerpo_mensaje    String
+  tipo_notif        String
+  leido             Boolean
+  fecha_creacion    DateTime
+
+  usuario           usuarios @relation(fields: [id_usuario], references: [id_usuario])
+}
+
+// ENUMS 
+enum EstadoSolicitud {
+  pendiente
+  aceptada
+  rechazada
+}
+
+enum EstadoTrayecto {
+  en_curso
+  finalizado
+  cancelado
+}
+
+enum TipoEmergencia {
+  accidente
+  acoso
+  falla_mecanica
+  otro
+}
